@@ -29,7 +29,7 @@ class SingleStreamStrategy:
         self.model = keras.models.load_model(f'infra/models/model_run7_epoch180.keras')
 
         self.frame_selection = FrameSelection(
-            n=imgs_per_animal, 
+            imgs_per_animal=imgs_per_animal, 
             ratio=fselection_ratio, 
             duration=fselection_time
         )
@@ -49,7 +49,7 @@ class SingleStreamStrategy:
 
                 img = self.image_capture.get_frame()
                 img = self.data_enhance.run(img)
-                suitable = self.frame_selection.evaluate(img=img)
+                suitable = self.frame_selection.evaluate(animal_code=animal)
                 if suitable:
                     weights.append(
                         self.predict_weight.predict(imgs=[img])
