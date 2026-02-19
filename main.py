@@ -1,10 +1,14 @@
-import sys
+from datetime import datetime
+import sys, os
+
+from infra.profiling.agents import CPUMonitor, RAMMonitor
 from domain.pipelines import SingleStreamStrategy
 
 def main(
-        strategy: str, herd_size: int, imgs_per_animal: int, arrival_time: int, fselection_time: float, fselection_ratio:int):
+        pid: str, strategy: str, herd_size: int, imgs_per_animal: int, arrival_time: int, fselection_time: float, fselection_ratio:int):
     
     pipeline = SingleStreamStrategy(
+        pid=pid,
         herd_size=herd_size, 
         imgs_per_animal=imgs_per_animal, 
         arrival_time=arrival_time, 
@@ -14,8 +18,32 @@ def main(
     
     pipeline.run()
 
-if __name__ == "__main__":    
-    main(
-        strategy = sys.argv[1], herd_size = int(sys.argv[2]), imgs_per_animal = int(sys.argv[3]), 
-        arrival_time = int(sys.argv[4]), fselection_time = float(sys.argv[5]), fselection_ratio=float(sys.argv[6]),
-    )
+if __name__ == "__main__":
+    strategy = sys.argv[1]
+    pid = f'{strategy}_{datetime.now().isoformat()}'
+
+    cpu_monitor = CPUMonitor(pid=pid)
+    ram_monitor = RAMMonitor(pid=pid)
+
+    try:
+        os.mkdir(f'infra/reports/{pid}')
+    except FileExistsError:
+        pass
+
+    cpu_monitor.start()
+    ram_monitor.start()
+    
+    try:
+        # Main program logic
+        main(
+            pid=pid, strategy = strategy, herd_size = int(sys.argv[2]), imgs_per_animal = int(sys.argv[3]), 
+            arrival_time = int(sys.argv[4]), fselection_time = float(sys.argv[5]), fselection_ratio=float(sys.argv[6]),
+        )
+
+    finally:
+        # Ensure the monitoring thread is stopped when done or on error
+        cpu_monitor.stop()
+        cpu_monitor.join() # Wait for the thread to finish
+
+        ram_monitor.stop()
+        ram_monitor.join()
