@@ -2,7 +2,7 @@ from datetime import datetime
 import sys, os
 
 from infra.profiling.agents import CPUMonitor, RAMMonitor, GPUMonitor
-from domain.pipelines import SingleStreamStrategy
+from domain.pipelines import SingleStreamStrategy, BatchStreamStrategy
 
 def main(
         pid: str, strategy: str, herd_size: int, imgs_per_animal: int, arrival_time: int, fselection_time: float, fselection_ratio:int):
@@ -14,7 +14,14 @@ def main(
         arrival_time=arrival_time, 
         fselection_ratio=fselection_ratio, 
         fselection_time=fselection_time,
-    ) if strategy == 'single' else None
+    ) if strategy == 'single' else BatchStreamStrategy(
+        pid=pid,
+        herd_size=herd_size, 
+        imgs_per_animal=imgs_per_animal, 
+        arrival_time=arrival_time, 
+        fselection_ratio=fselection_ratio, 
+        fselection_time=fselection_time,
+    )
     
     pipeline.run()
 
