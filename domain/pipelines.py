@@ -94,7 +94,7 @@ class SingleStreamStrategy:
         with open(f"infra/reports/{self.pid}/metrics.json", "w") as json_file:
             json.dump(self.metrics, json_file, indent=4)
 
-class BatchStremStrategy:
+class BatchStreamStrategy:
 
     '''
     Docstring for BatchStreamStrategy
