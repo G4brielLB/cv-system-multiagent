@@ -145,7 +145,7 @@ class GPUMonitor(threading.Thread):
 
     def __get_gpu_memor(self):
         # Shows allocated shared memory
-        cmd = "vcgencmd mem_oom"
+        cmd = "vcgencmd get_mem gpu"
         result = subprocess.run(cmd.split(), capture_output=True, text=True)
         return result.stdout.strip()
     
