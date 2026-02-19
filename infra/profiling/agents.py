@@ -101,18 +101,22 @@ class GPUMonitor(threading.Thread):
         while self.running:
             gpu_usage = self.__get_gpu_usage()
             gpu_memor = self.__get_gpu_memor()
+            gpu_volts = self.__get_gpu_volts()
+            gpu_tempr = self.__get_gpu_tempr()
             
             linha = [
                 datetime.now().isoformat(),
                 gpu_usage,
                 gpu_memor,
+                gpu_volts,
+                gpu_tempr,
             ]
             self.data.append(linha)    
             
             print(f'GPU: {linha}')            
             
-            # wait 1 sec
-            time.sleep(1)
+            # wait 3 secs, pq Videocore4 GPU tende a não ser tão utilizado!
+            time.sleep(3)
 
     def stop(self):
         self.running = False
@@ -122,6 +126,8 @@ class GPUMonitor(threading.Thread):
             "timestamp",
             "gpu_usage",
             "gpu_memor",
+            "gpu_volts",
+            "gpu_tempr",
         ]
 
         # Salvar CSV
@@ -139,6 +145,18 @@ class GPUMonitor(threading.Thread):
 
     def __get_gpu_memor(self):
         # Shows allocated shared memory
-        cmd = "vcgencmd get_mem gpu"
+        cmd = "vcgencmd mem_oom"
+        result = subprocess.run(cmd.split(), capture_output=True, text=True)
+        return result.stdout.strip()
+    
+    def __get_gpu_volts(self):
+        # Shows allocated shared memory
+        cmd = "vcgencmd volts"
+        result = subprocess.run(cmd.split(), capture_output=True, text=True)
+        return result.stdout.strip()
+
+    def __get_gpu_tempr(self):
+        # Shows allocated shared memory
+        cmd = "vcgencmd temp"
         result = subprocess.run(cmd.split(), capture_output=True, text=True)
         return result.stdout.strip()
