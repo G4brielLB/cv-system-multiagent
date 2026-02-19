@@ -1,4 +1,4 @@
-import threading, time, psutil, csv, GPUtil
+import threading, time, psutil, csv, subprocess
 from datetime import datetime
 
 class CPUMonitor(threading.Thread):
@@ -91,7 +91,7 @@ class RAMMonitor(threading.Thread):
 
 class GPUMonitor(threading.Thread):
     def __init__(self, pid: str):
-        super().__init__()
+        super().__init__()        
         self.pid = pid
         self.running = True
         self.data = []
@@ -99,22 +99,18 @@ class GPUMonitor(threading.Thread):
 
     def run(self):
         while self.running:
-            gpus = GPUtil.getGPUs()
-
-            for gpu in gpus:
-                linha = [
-                    datetime.now().isoformat(),
-                    gpu.id,
-                    gpu.name,
-                    gpu.load * 100,
-                    gpu.memoryUsed,
-                    gpu.memoryTotal,
-                    gpu.memoryUtil * 100,
-                    gpu.temperature
-                ]
-                self.data.append(linha)    
+            gpu_usage = self.__get_gpu_usage()
+            gpu_memor = self.__get_gpu_memor()
             
-            print(f'GPU: {gpus}')            
+            linha = [
+                datetime.now().isoformat(),
+                gpu_usage,
+                gpu_memor,
+            ]
+            self.data.append(linha)    
+            
+            print(f'GPU: {linha}')            
+            
             # wait 1 sec
             time.sleep(1)
 
@@ -124,13 +120,8 @@ class GPUMonitor(threading.Thread):
         # Cabeçalho CSV
         header = [
             "timestamp",
-            "gpu_id",
-            "nome",
-            "uso_gpu_percent",
-            "memoria_usada_MB",
-            "memoria_total_MB",
-            "uso_memoria_percent",
-            "temperatura_C"
+            "gpu_usage",
+            "gpu_memor",
         ]
 
         # Salvar CSV
@@ -138,3 +129,16 @@ class GPUMonitor(threading.Thread):
             writer = csv.writer(f)
             writer.writerow(header)
             writer.writerows(self.data)
+
+    def __get_gpu_usage(self):
+        # vcgencmd does not provide a simple percentage, 
+        # but provides freq/voltage info.
+        cmd = "vcgencmd measure_clock v3d"
+        result = subprocess.run(cmd.split(), capture_output=True, text=True)
+        return result.stdout.strip()
+
+    def __get_gpu_memor(self):
+        # Shows allocated shared memory
+        cmd = "vcgencmd get_mem gpu"
+        result = subprocess.run(cmd.split(), capture_output=True, text=True)
+        return result.stdout.strip()
