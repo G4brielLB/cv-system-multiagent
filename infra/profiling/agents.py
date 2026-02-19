@@ -1,4 +1,4 @@
-import threading, time, psutil, csv
+import threading, time, psutil, csv, GPUtil
 from datetime import datetime
 
 class CPUMonitor(threading.Thread):
@@ -84,6 +84,57 @@ class RAMMonitor(threading.Thread):
 
         # Salvar arquivo
         with open(f"infra/reports/{self.pid}/mem.csv", mode="w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            writer.writerows(self.data)
+
+
+class GPUMonitor(threading.Thread):
+    def __init__(self, pid: str):
+        super().__init__()
+        self.pid = pid
+        self.running = True
+        self.data = []
+        self.daemon = True # Allows the main program to exit even if thread is running
+
+    def run(self):
+        while self.running:
+            gpus = GPUtil.getGPUs()
+
+            for gpu in gpus:
+                linha = [
+                    datetime.now().isoformat(),
+                    gpu.id,
+                    gpu.name,
+                    gpu.load * 100,
+                    gpu.memoryUsed,
+                    gpu.memoryTotal,
+                    gpu.memoryUtil * 100,
+                    gpu.temperature
+                ]
+                self.data.append(linha)    
+            
+            print(f'GPU: {gpus}')            
+            # wait 1 sec
+            time.sleep(1)
+
+    def stop(self):
+        self.running = False
+
+        # Cabeçalho CSV
+        header = [
+            "timestamp",
+            "gpu_id",
+            "nome",
+            "uso_gpu_percent",
+            "memoria_usada_MB",
+            "memoria_total_MB",
+            "uso_memoria_percent",
+            "temperatura_C"
+        ]
+
+        # Salvar CSV
+        with open(f"infra/reports/{self.pid}/gpu.csv", mode="w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(header)
             writer.writerows(self.data)

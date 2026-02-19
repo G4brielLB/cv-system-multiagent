@@ -1,7 +1,7 @@
 from datetime import datetime
 import sys, os
 
-from infra.profiling.agents import CPUMonitor, RAMMonitor
+from infra.profiling.agents import CPUMonitor, RAMMonitor, GPUMonitor
 from domain.pipelines import SingleStreamStrategy
 
 def main(
@@ -24,6 +24,7 @@ if __name__ == "__main__":
 
     cpu_monitor = CPUMonitor(pid=pid)
     ram_monitor = RAMMonitor(pid=pid)
+    gpu_monitor = GPUMonitor(pid=pid)
 
     try:
         os.mkdir(f'infra/reports/{pid}')
@@ -32,6 +33,7 @@ if __name__ == "__main__":
 
     cpu_monitor.start()
     ram_monitor.start()
+    gpu_monitor.start()
     
     try:
         # Main program logic
@@ -47,3 +49,6 @@ if __name__ == "__main__":
 
         ram_monitor.stop()
         ram_monitor.join()
+
+        gpu_monitor.stop()
+        gpu_monitor.join()        
