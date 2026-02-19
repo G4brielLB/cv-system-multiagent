@@ -151,12 +151,12 @@ class GPUMonitor(threading.Thread):
     
     def __get_gpu_volts(self):
         # Shows allocated shared memory
-        cmd = "vcgencmd volts"
+        cmd = "vcgencmd measure_volts"
         result = subprocess.run(cmd.split(), capture_output=True, text=True)
         return result.stdout.strip()
 
     def __get_gpu_tempr(self):
         # Shows allocated shared memory
-        cmd = "vcgencmd temp"
+        cmd = "vcgencmd measure_temp"
         result = subprocess.run(cmd.split(), capture_output=True, text=True)
         return result.stdout.strip()
