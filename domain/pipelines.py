@@ -35,8 +35,8 @@ class SingleStreamStrategy:
         self.herd_size = herd_size
         self.arrival_time = arrival_time
         
-        self.model = keras.models.load_model(f'infra/models/model_run7_epoch180.keras')
-        self.metrics['load_model_final'] = datetime.now().isoformat()         
+        self.model = keras.models.load_model(f'infra/models/model_run1_epoch029.keras')
+        self.metrics['load_model_final'] = datetime.now().isoformat()
 
         self.frame_selection = FrameSelection(
             imgs_per_animal=imgs_per_animal, 
@@ -112,7 +112,7 @@ class BatchStreamStrategy:
         self.herd_size = herd_size
         self.arrival_time = arrival_time
         
-        self.model = keras.models.load_model(f'infra/models/model_run7_epoch180.keras')
+        self.model = keras.models.load_model(f'infra/models/model_run1_epoch029.keras')
         self.metrics['load_model_final'] = datetime.now().isoformat()         
 
         self.frame_selection = FrameSelection(

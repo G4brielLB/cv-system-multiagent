@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     cpu_monitor.start()
     ram_monitor.start()
-    gpu_monitor.start()
+    # gpu_monitor.start()
     
     try:
         # Main program logic
@@ -57,5 +57,5 @@ if __name__ == "__main__":
         ram_monitor.stop()
         ram_monitor.join()
 
-        gpu_monitor.stop()
-        gpu_monitor.join()        
+        # gpu_monitor.stop()
+        # gpu_monitor.join()        
