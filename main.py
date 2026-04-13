@@ -5,22 +5,22 @@ from infra.profiling.agents import CPUMonitor, RAMMonitor, GPUMonitor
 from domain.pipelines import SingleStreamStrategy, BatchStreamStrategy
 
 def main(
-        pid: str, strategy: str, herd_size: int, imgs_per_animal: int, arrival_time: int, fselection_time: float, fselection_ratio:int):
+        pid: str, strategy: str, herd_size: int, passage_time: int, arrival_time: int, fselection_time: float, fselection_window:float):
     
     pipeline = SingleStreamStrategy(
         pid=pid,
         herd_size=herd_size, 
-        imgs_per_animal=imgs_per_animal, 
         arrival_time=arrival_time, 
-        fselection_ratio=fselection_ratio, 
+        passage_time=passage_time,
         fselection_time=fselection_time,
+        fselection_window=fselection_window, 
     ) if strategy == 'single' else BatchStreamStrategy(
         pid=pid,
         herd_size=herd_size, 
-        imgs_per_animal=imgs_per_animal, 
+        passage_time=passage_time,
         arrival_time=arrival_time, 
-        fselection_ratio=fselection_ratio, 
         fselection_time=fselection_time,
+        fselection_window=fselection_window, 
     )
     
     pipeline.run()
@@ -45,8 +45,7 @@ if __name__ == "__main__":
     try:
         # Main program logic
         main(
-            pid=pid, strategy = strategy, herd_size = int(sys.argv[2]), imgs_per_animal = int(sys.argv[3]), 
-            arrival_time = int(sys.argv[4]), fselection_time = float(sys.argv[5]), fselection_ratio=float(sys.argv[6]),
+            pid=pid, strategy = strategy, herd_size = int(sys.argv[2]), passage_time = int(sys.argv[3]), arrival_time = int(sys.argv[4]), fselection_time = float(sys.argv[5]), fselection_window=float(sys.argv[6]),
         )
 
     finally:

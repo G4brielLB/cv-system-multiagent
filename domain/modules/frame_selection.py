@@ -4,28 +4,19 @@ import time
 class FrameSelection:
 
     '''
-    ?????
-    - n: the amount of imager per animal
-    - rateio: percent of images that should be considered suitable
+    Perform the frame selection task
+    - suitable_window: the window of seconds that should be considered suitable
+    - snooze_duration: the duration of the sleep in seconds
     '''
-    def __init__(self, imgs_per_animal: int, ratio: float, duration: float):
-        self.duration = duration
+    def __init__(self, suitable_window: float, snooze_duration: float):
+        self.suitable_window = suitable_window
+        self.snooze_duration = snooze_duration
 
-        median = int(imgs_per_animal / 2)
-        qtt = imgs_per_animal * ratio
-        qtt_median = int(qtt / 2)
+    def evaluate(self, elapsed_time: float):
+        suite = False
 
-        self.interval = range(median - qtt_median, median + qtt_median + 1)
-        self.n = 0
-        self.animal_code = None
-
-
-    def evaluate(self, animal_code: str):
-        time.sleep(self.duration)
-
-        if self.animal_code != animal_code:
-            self.animal_code = animal_code
-            self.n = 0
+        if elapsed_time <= self.suitable_window:
+            suite = True
         
-        self.n += 1
-        return self.n in self.interval
+        time.sleep(self.snooze_duration)
+        return suite

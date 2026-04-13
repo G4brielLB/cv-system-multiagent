@@ -23,7 +23,7 @@ class SingleStreamStrategy:
     Docstring for SingleStreamStrategy
     '''
     def __init__(self, pid: str,
-        herd_size: int, imgs_per_animal: int, arrival_time: int, fselection_time: float, fselection_ratio:int):
+        herd_size: int, arrival_time: int, passage_time: int, fselection_time: float, fselection_window:float):
         
         self.pid = pid
         self.metrics = {
@@ -31,17 +31,16 @@ class SingleStreamStrategy:
             'load_model_start':datetime.now().isoformat(),
         }
 
-        self.imgs_per_animal = imgs_per_animal
         self.herd_size = herd_size
         self.arrival_time = arrival_time
+        self.passage_time = passage_time
         
         self.model = keras.models.load_model(f'infra/models/model_run1_epoch029.keras')
         self.metrics['load_model_final'] = datetime.now().isoformat()
 
         self.frame_selection = FrameSelection(
-            imgs_per_animal=imgs_per_animal, 
-            ratio=fselection_ratio, 
-            duration=fselection_time
+            suitable_window=fselection_window, 
+            snooze_duration=fselection_time
         )
         
         self.image_capture = ImageCapture()
@@ -53,6 +52,7 @@ class SingleStreamStrategy:
         
         for animal in range(1, self.herd_size + 1):
             print(f'animal: {animal}')
+            start_at = datetime.now()
 
             self.metrics['animals'][animal] = {
                 'first_image_capture_time':datetime.now().isoformat(),
@@ -60,17 +60,20 @@ class SingleStreamStrategy:
             }
 
             weights = []
-            for i in range(1, self.imgs_per_animal):
+            i = 0
+            
+            elapsed_time = (datetime.now() - start_at).total_seconds()
+            last_image_capture = None
+            while elapsed_time < self.passage_time:
+                i += 1
                 print(f'image: {i}')
 
-                img = self.image_capture.get_frame()
-                
-                if (i == self.imgs_per_animal - 1):
-                    self.metrics['animals'][animal]['last_image_capture_time'] = datetime.now().isoformat()
+                img = self.image_capture.get_frame()             
+                last_image_capture = datetime.now().isoformat()
                 
                 img = self.data_enhance.run(img)
                 
-                suitable = self.frame_selection.evaluate(animal_code=animal)
+                suitable = self.frame_selection.evaluate(elapsed_time=elapsed_time)
                 if suitable:
                     inference_metrics = {
                         'weight_prediction_start':datetime.now().isoformat()
@@ -81,7 +84,10 @@ class SingleStreamStrategy:
 
                     inference_metrics['weight_prediction_final'] = datetime.now().isoformat()
                     self.metrics['animals'][animal]['imgs'][i] = inference_metrics
+
+                elapsed_time = (datetime.now() - start_at).total_seconds()
             
+            self.metrics['animals'][animal]['last_image_capture_time'] = last_image_capture
             print(weights)
 
             predicted_weight = np.mean(weights)
@@ -100,7 +106,7 @@ class BatchStreamStrategy:
     Docstring for BatchStreamStrategy
     '''
     def __init__(self, pid: str,
-        herd_size: int, imgs_per_animal: int, arrival_time: int, fselection_time: float, fselection_ratio:int):
+        herd_size: int, arrival_time: int, passage_time: int, fselection_time: float, fselection_window:float):
         
         self.pid = pid
         self.metrics = {
@@ -108,17 +114,16 @@ class BatchStreamStrategy:
             'load_model_start':datetime.now().isoformat(),
         }
 
-        self.imgs_per_animal = imgs_per_animal
         self.herd_size = herd_size
         self.arrival_time = arrival_time
-        
+        self.passage_time = passage_time
+
         self.model = keras.models.load_model(f'infra/models/model_run1_epoch029.keras')
         self.metrics['load_model_final'] = datetime.now().isoformat()         
 
         self.frame_selection = FrameSelection(
-            imgs_per_animal=imgs_per_animal, 
-            ratio=fselection_ratio, 
-            duration=fselection_time
+            suitable_window=fselection_window, 
+            snooze_duration=fselection_time
         )
         
         self.image_capture = ImageCapture()
@@ -130,6 +135,7 @@ class BatchStreamStrategy:
         
         for animal in range(1, self.herd_size + 1):
             print(f'animal: {animal}')
+            start_at = datetime.now()
 
             self.metrics['animals'][animal] = {
                 'first_image_capture_time':datetime.now().isoformat(),
@@ -137,20 +143,27 @@ class BatchStreamStrategy:
             }
 
             imgs = []
-            for i in range(1, self.imgs_per_animal):
+            i = 0
+            
+            elapsed_time = (datetime.now() - start_at).total_seconds()
+            last_image_capture = None
+
+            while elapsed_time < self.passage_time:
+                i += 1
                 print(f'image: {i}')
 
                 img = self.image_capture.get_frame()
-                
-                if (i == self.imgs_per_animal - 1):
-                    self.metrics['animals'][animal]['last_image_capture_time'] = datetime.now().isoformat()
+                last_image_capture = datetime.now().isoformat()
                 
                 img = self.data_enhance.run(img)
 
-                suitable = self.frame_selection.evaluate(animal_code=animal)
+                suitable = self.frame_selection.evaluate(elapsed_time=elapsed_time)
                 if suitable:
                     imgs.append(img)
-            
+
+                elapsed_time = (datetime.now() - start_at).total_seconds()
+                
+            self.metrics['animals'][animal]['last_image_capture_time'] = last_image_capture
             inference_metrics = {
                 'weight_prediction_start':datetime.now().isoformat()
             }
