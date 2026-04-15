@@ -183,3 +183,79 @@ class BatchStreamStrategy:
 
         with open(f"infra/reports/{self.pid}/metrics.json", "w") as json_file:
             json.dump(self.metrics, json_file, indent=4)    
+
+class MASStrategy:
+    """Strategy for Multi-Agent System (MAS) execution.
+    
+    This strategy initializes the PADE framework and starts the agents
+    responsible for the multi-agent pipeline. It consolidates both
+    single and batch modes, as the mode is handled internally by agents.
+    """
+
+    def __init__(self, pid: str,
+                 herd_size: int, arrival_time: int, passage_time: int, 
+                 fselection_time: float, fselection_window: float):
+        self.pid = pid
+        self.herd_size = herd_size
+        self.arrival_time = arrival_time
+        self.passage_time = passage_time
+        self.fselection_time = fselection_time
+        self.fselection_window = fselection_window
+
+    def run(self):
+        """Starts the PADE agents and the main reactor loop."""
+        # 0. Lazy Imports e Configuração de Ambiente para Isolação Total
+        import os
+        from dotenv import load_dotenv
+        load_dotenv(override=True)  # Garante a leitura do .env
+        
+        import mas  # IMPORTANTE: Adiciona as pastas ao sys.path
+        from pade.acl.aid import AID
+        from pade.misc.utility import display_message
+        from pade.core.new_ams import AMS
+        from twisted.internet import reactor
+        from mas.agents.resource_manager_agent import ResourceManagerAgent
+
+        # 1. Configuração via Variáveis de Ambiente (.env)
+        ams_host = os.getenv("SMA_AMS_HOST", "localhost")
+        ams_port = int(os.getenv("SMA_AMS_PORT", 8000))
+        agent_host = os.getenv("SMA_AGENT_HOST", "localhost")
+        base_port = int(os.getenv("SMA_AGENT_BASE_PORT", 5003))
+        
+        display_message("MASStrategy", f"Iniciando MAS Strategy para PID: {self.pid}")
+        display_message("MASStrategy", f"Configuração: AMS={ams_host}:{ams_port}, BasePort={base_port}")
+
+        # 2. Configuração do AMS Agent (standalone)
+        ams_agent = AMS(host=ams_host, port=ams_port)
+        ams_agent.register_user("admin", "admin@pade.com", "admin")
+        ams_agent._initialize_database()
+
+        # 3. Instantiate Resource Manager Agent
+        # Padrão POC: Resource Manager na base + 6
+        rm_port = base_port + 6
+        agent_name = f"resource_manager_agent@{agent_host}:{rm_port}"
+        agent_aid = AID(name=agent_name)
+        
+        resource_agent = ResourceManagerAgent(
+            aid=agent_aid,
+            pid=self.pid,
+            reports_dir="infra/reports",
+            debug=False
+        )
+        # Aponta para o AMS configurado
+        resource_agent.ams = {"name": ams_host, "port": ams_port}
+
+        # 4. Setup Reactor shutdown hook for clean monitor stop
+        reactor.addSystemEventTrigger(
+            'before', 'shutdown', resource_agent.stop_monitoring
+        )
+
+        display_message("MASStrategy", f"Serviços PADE configurados. RM Agent em porta {rm_port}.")
+
+        # 5. Start PADE Loop manualmente para evitar conflitos de porta 8000
+        resource_agent.update_ams(resource_agent.ams)
+        resource_agent.on_start()
+        reactor.listenTCP(resource_agent.aid.port, resource_agent.agentInstance)
+        
+        display_message("MASStrategy", "Iniciando reator Twisted...")
+        reactor.run()

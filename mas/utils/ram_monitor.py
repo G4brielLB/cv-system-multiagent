@@ -17,6 +17,7 @@ Paridade garantida:
 import csv
 import threading
 import time
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -44,18 +45,34 @@ class RAMMonitor(threading.Thread):
         while self.running:
             mem = psutil.virtual_memory()
 
-            line = [
-                datetime.now().isoformat(),
-                mem.total,
-                mem.available,
-                mem.used,
-                mem.percent,
-                mem.free,
-                mem.active,
-                mem.inactive,
-                mem.buffers,
-                mem.cached,
-            ]
+            # Compatibilidade macOS vs Linux (Raspberry Pi)
+            if sys.platform == 'darwin':
+                line = [
+                    datetime.now().isoformat(),
+                    mem.total,
+                    mem.available,
+                    mem.used,
+                    mem.percent,
+                    mem.free,
+                    getattr(mem, 'active', 0),
+                    getattr(mem, 'inactive', 0),
+                    0, # buffers (não disponível no mac)
+                    0, # cached (não disponível no mac)
+                ]
+            else:
+                # Código original do baseline para Raspberry Pi/Linux
+                line = [
+                    datetime.now().isoformat(),
+                    mem.total,
+                    mem.available,
+                    mem.used,
+                    mem.percent,
+                    mem.free,
+                    mem.active,
+                    mem.inactive,
+                    mem.buffers,
+                    mem.cached,
+                ]
 
             with self._lock:
                 self._data.append(line)

@@ -24,17 +24,26 @@ para uso futuro por outros agentes do MAS.
 """
 
 import os
+import csv
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
 
+import mas  # noqa: F401 — side-effect: adiciona mas/ ao sys.path
+
 from pade.core.agent import Agent
+from pade.acl.messages import ACLMessage
+from pade.acl.aid import AID
 from pade.behaviours.protocols import TimedBehaviour
 from pade.misc.utility import display_message
 
-from mas.adapters.blackboard_adapter import BlackboardAdapter, InMemoryBlackboardAdapter
+# Import monitors from mas.utils (Adapter approach)
 from mas.utils.cpu_monitor import CPUMonitor
 from mas.utils.ram_monitor import RAMMonitor
+
+# Blackboard Adapter
+from mas.adapters.blackboard_adapter import BlackboardAdapter, InMemoryBlackboardAdapter
 
 
 class _PublishMetricsToBlackboard(TimedBehaviour):
@@ -176,9 +185,13 @@ class ResourceManagerAgent(Agent):
             )
             self.behaviours.append(self._blackboard_publisher)
 
-    def on_shutdown(self):
-        """Para os monitores e escreve os CSVs."""
-        display_message(self.aid.name, "ResourceManagerAgent encerrando.")
+    def stop_monitoring(self):
+        """Para os monitores e escreve os CSVs.
+
+        Método chamado explicitamente pelo launcher (MASResourceStrategy)
+        ou via signal handler, pois o PADE não chama on_shutdown automaticamente.
+        """
+        display_message(self.aid.name, "ResourceManagerAgent — stop_monitoring chamado.")
 
         if self.cpu_monitor:
             self.cpu_monitor.stop()
@@ -188,4 +201,4 @@ class ResourceManagerAgent(Agent):
             self.ram_monitor.stop()
             self.ram_monitor.join()
 
-        super().on_shutdown()
+        display_message(self.aid.name, "Monitores parados — CSVs gravados.")
