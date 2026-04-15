@@ -23,9 +23,6 @@ O agente também grava as últimas métricas em um blackboard em memória
 para uso futuro por outros agentes do MAS.
 """
 
-import os
-import csv
-import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -33,8 +30,6 @@ from pathlib import Path
 import mas  # noqa: F401 — side-effect: adiciona mas/ ao sys.path
 
 from pade.core.agent import Agent
-from pade.acl.messages import ACLMessage
-from pade.acl.aid import AID
 from pade.behaviours.protocols import TimedBehaviour
 from pade.misc.utility import display_message
 
@@ -188,7 +183,7 @@ class ResourceManagerAgent(Agent):
     def stop_monitoring(self):
         """Para os monitores e escreve os CSVs.
 
-        Método chamado explicitamente pelo launcher (MASResourceStrategy)
+        Método chamado explicitamente pelo launcher (MASStrategy)
         ou via signal handler, pois o PADE não chama on_shutdown automaticamente.
         """
         display_message(self.aid.name, "ResourceManagerAgent — stop_monitoring chamado.")
