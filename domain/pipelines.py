@@ -40,7 +40,7 @@ class SingleStreamStrategy:
 
         self.frame_selection = FrameSelection(
             suitable_window=fselection_window, 
-            snooze_duration=fselection_time
+            model=self.model
         )
         
         self.image_capture = ImageCapture()
@@ -73,7 +73,10 @@ class SingleStreamStrategy:
                 
                 img = self.data_enhance.run(img)
                 
-                suitable = self.frame_selection.evaluate(elapsed_time=elapsed_time)
+                suitable = self.frame_selection.evaluate(
+                    elapsed_time=elapsed_time,
+                    img=img
+                )
                 if suitable:
                     inference_metrics = {
                         'weight_prediction_start':datetime.now().isoformat()
@@ -123,7 +126,7 @@ class BatchStreamStrategy:
 
         self.frame_selection = FrameSelection(
             suitable_window=fselection_window, 
-            snooze_duration=fselection_time
+            model=self.model
         )
         
         self.image_capture = ImageCapture()
@@ -157,7 +160,10 @@ class BatchStreamStrategy:
                 
                 img = self.data_enhance.run(img)
 
-                suitable = self.frame_selection.evaluate(elapsed_time=elapsed_time)
+                suitable = self.frame_selection.evaluate(
+                    elapsed_time=elapsed_time,
+                    img=img
+                )
                 if suitable:
                     imgs.append(img)
 
