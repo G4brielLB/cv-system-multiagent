@@ -147,6 +147,7 @@ class BatchStreamStrategy:
 
             imgs = []
             i = 0
+            s = 0
             
             elapsed_time = (datetime.now() - start_at).total_seconds()
             last_image_capture = None
@@ -160,15 +161,16 @@ class BatchStreamStrategy:
                 
                 img = self.data_enhance.run(img)
 
-                suitable = self.frame_selection.evaluate(
-                    elapsed_time=elapsed_time,
-                    img=img
-                )
+                suitable = self.frame_selection.evaluate(elapsed_time=elapsed_time, img=img)
                 if suitable:
                     imgs.append(img)
+                    s += 1
 
                 elapsed_time = (datetime.now() - start_at).total_seconds()
                 
+            self.metrics['animals'][animal]['total_of_images'] = i
+            self.metrics['animals'][animal]['suitable_images'] = s
+
             self.metrics['animals'][animal]['last_image_capture_time'] = last_image_capture
             inference_metrics = {
                 'weight_prediction_start':datetime.now().isoformat()
