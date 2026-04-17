@@ -199,10 +199,11 @@ class MASStrategy:
     processed.
     """
 
-    def __init__(self, pid: str,
+    def __init__(self, pid: str, mode: str,
                  herd_size: int, arrival_time: int, passage_time: int,
                  fselection_time: float, fselection_window: float):
         self.pid = pid
+        self.mode = mode
         self.herd_size = herd_size
         self.arrival_time = arrival_time
         self.passage_time = passage_time
@@ -271,15 +272,16 @@ class MASStrategy:
             snooze_duration=self.fselection_time,
         )
 
-        import keras
-        model = keras.models.load_model("infra/models/model_run1_epoch029.keras")
-        inference_adapter = InferenceAdapter(model)
+        # We pass the path to allow lazy/async loading in the agent
+        model_path = "infra/models/model_run1_epoch029.keras"
+        inference_adapter = InferenceAdapter(model_path)
 
         # 5. Agents
         capture_agent = CaptureAgent(
             aid=capture_aid,
             capture_adapter=capture_adapter,
-            next_agent_aid=str(enhance_aid),
+            next_agent_aid=enhance_aid.name,
+            selection_agent_aid=selection_aid.name,
             interval_seconds=0.2,
             herd_size=self.herd_size,
             passage_time=self.passage_time,
@@ -289,18 +291,21 @@ class MASStrategy:
         enhance_agent = DataEnhanceAgent(
             aid=enhance_aid,
             data_enhance_adapter=enhance_adapter,
-            next_agent_aid=str(selection_aid),
+            next_agent_aid=selection_aid.name,
         )
 
         selection_agent = FrameSelectionAgent(
             aid=selection_aid,
             frame_selection_adapter=selection_adapter,
-            next_agent_aid=str(predict_aid),
+            next_agent_aid=predict_aid.name,
         )
 
         predict_agent = PredictWeightAgent(
             aid=predict_aid,
             inference_adapter=inference_adapter,
+            mode=self.mode,
+            pid=self.pid,
+            herd_size=self.herd_size
         )
 
         resource_agent = ResourceManagerAgent(
@@ -318,8 +323,8 @@ class MASStrategy:
 
         # 7. Wire all agents to AMS and reactor
         all_agents = [
-            capture_agent, enhance_agent, selection_agent,
-            predict_agent, resource_agent,
+            resource_agent, capture_agent, enhance_agent, 
+            selection_agent, predict_agent
         ]
 
         for agent in all_agents:

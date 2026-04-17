@@ -23,6 +23,7 @@ def main(
         fselection_window=fselection_window, 
     ) if strategy == 'batch' else MASStrategy(
         pid=pid,
+        mode='batch' if 'batch' in strategy else 'single',
         herd_size=herd_size, 
         passage_time=passage_time,
         arrival_time=arrival_time, 

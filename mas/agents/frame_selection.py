@@ -11,6 +11,7 @@ simulated latency parity with the baseline.
 """
 
 import json
+import threading
 
 from twisted.internet.threads import deferToThread
 
@@ -38,6 +39,12 @@ class FrameSelectionAgent(Agent):
         self.next_agent_aid = next_agent_aid
         self.discarded = 0
         self.forwarded = 0
+        self._lock = threading.Lock()
+        
+        self.expected_frames = {}
+        self.processed_frames = {}
+        self.suitable_frames = {}
+        self.capture_metrics_buffer = {}
 
     def _parse_payload(self, message) -> dict | None:
         try:
@@ -50,31 +57,69 @@ class FrameSelectionAgent(Agent):
             return None
         return payload
 
-    def _on_evaluation_done(self, result, payload: dict):
-        if result:
-            self.forwarded += 1
-            out = ACLMessage(ACLMessage.INFORM)
-            out.set_ontology("frame-selected")
-            out.add_receiver(AID(self.next_agent_aid))
-            out.set_content(json.dumps(payload, ensure_ascii=True))
-            self.send(out)
-            display_message(
-                self.aid.name,
-                f"frame_id={payload['frame_id']} SUITABLE (forwarded). "
-                f"metrics: forwarded={self.forwarded} discarded={self.discarded}",
-            )
-        else:
+    def _forward_frame(self, payload: dict):
+        out = ACLMessage(ACLMessage.INFORM)
+        out.set_ontology("frame-selected")
+        out.add_receiver(AID(self.next_agent_aid))
+        out.set_content(json.dumps(payload, ensure_ascii=True))
+        self.send(out)
+
+    def _check_batch_ready(self, animal_id: int):
+        """Verify if all frames for the animal have been processed and fire batch-ready."""
+        with self._lock:
+            expected = self.expected_frames.get(animal_id)
+            processed = self.processed_frames.get(animal_id, 0)
+            
+            if expected is not None and processed >= expected:
+                msg = ACLMessage(ACLMessage.INFORM)
+                msg.set_ontology("batch-ready")
+                msg.add_receiver(AID(self.next_agent_aid))
+                msg.set_content(json.dumps({
+                    "animal_id": animal_id,
+                    "suitable_count": self.suitable_frames.get(animal_id, 0),
+                    "total_frames": expected,
+                    "capture_metrics": self.capture_metrics_buffer.get(animal_id, {})
+                }, ensure_ascii=True))
+                self.send(msg)
+                
+                # Cleanup state
+                self.expected_frames.pop(animal_id, None)
+                self.processed_frames.pop(animal_id, None)
+                self.suitable_frames.pop(animal_id, None)
+                self.capture_metrics_buffer.pop(animal_id, None)
+                
+                display_message(self.aid.name, f"[BATCH READY] Sent animal_id={animal_id} to Predict!")
+
+    def _on_selection_complete(self, suitable: bool, payload: dict):
+        frame_id = payload["frame_id"]
+        animal_id = payload["animal_id"]
+        
+        with self._lock:
+            self.processed_frames[animal_id] = self.processed_frames.get(animal_id, 0) + 1
+            if suitable:
+                self.suitable_frames[animal_id] = self.suitable_frames.get(animal_id, 0) + 1
+
+        if not suitable:
             self.discarded += 1
-            frame_id = payload["frame_id"]
-            if frame_id in FRAME_BUFFER:
-                del FRAME_BUFFER[frame_id]
+            with self._lock:
+                FRAME_BUFFER.pop(frame_id, None)
             display_message(
                 self.aid.name,
                 f"frame_id={frame_id} DISCARDED (deleted from buffer). "
-                f"metrics: forwarded={self.forwarded} discarded={self.discarded}",
+                f"Discarded={self.discarded}, Forwarded={self.forwarded}",
             )
+        else:
+            self.forwarded += 1
+            display_message(
+                self.aid.name,
+                f"frame_id={frame_id} SUITABLE. "
+                f"Discarded={self.discarded}, Forwarded={self.forwarded}",
+            )
+            self._forward_frame(payload)
+            
+        self._check_batch_ready(animal_id)
 
-    def _on_evaluation_error(self, failure):
+    def _on_selection_error(self, failure):
         display_message(
             self.aid.name,
             f"[ERROR] Evaluation failed: {failure.getErrorMessage()}",
@@ -83,18 +128,37 @@ class FrameSelectionAgent(Agent):
     def _schedule_evaluation(self, payload: dict):
         elapsed = payload.get("elapsed_time", 0.0)
         d = deferToThread(self.frame_selection_adapter.evaluate, elapsed)
-        d.addCallback(self._on_evaluation_done, payload)
-        d.addErrback(self._on_evaluation_error)
+        d.addCallback(self._on_selection_complete, payload)
+        d.addErrback(self._on_selection_error)
 
     def react(self, message):
         super().react(message)
         if message.performative != ACLMessage.INFORM:
             return
+            
+        if message.ontology == "passage-complete":
+            try:
+                data = json.loads(message.content)
+                animal_id = data.get("animal_id")
+                with self._lock:
+                    self.expected_frames[animal_id] = data.get("total_frames")
+                    self.capture_metrics_buffer[animal_id] = {
+                        "first_image_capture_time": data.get("first_capture"),
+                        "last_image_capture_time": data.get("last_capture")
+                    }
+                display_message(self.aid.name, f"[SYNC] Expected {self.expected_frames[animal_id]} frames for animal {animal_id}")
+                self._check_batch_ready(animal_id)
+            except Exception as e:
+                display_message(self.aid.name, f"[ERROR] Parsing passage-complete: {e}")
+            return
+            
         if message.ontology != "frame-enhanced":
             return
+            
         payload = self._parse_payload(message)
         if not payload:
             return
+
         self._schedule_evaluation(payload)
 
     def on_start(self):
