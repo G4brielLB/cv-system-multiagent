@@ -62,7 +62,7 @@ class CaptureBehaviour(TimedBehaviour):
         self.herd_size = herd_size
 
         self.current_animal_id = 1
-        self.start_at = time.time()
+        self.start_at = None
         self._finished = False
         self._lock = threading.Lock()
         
@@ -73,25 +73,35 @@ class CaptureBehaviour(TimedBehaviour):
 
     def on_time(self):
         super().on_time()
-
+        
         if self._finished:
             return
+
+        # --- WAIT for simulation ignition ---
+        if not self.agent.simulation_started:
+            return
+
+        # Initialize timeline on the very first pulse after ignition
+        if self.start_at is None:
+            self.start_at = time.time()
+            display_message(self.agent.aid.name, f"Timeline started for Animal {self.current_animal_id}")
 
         elapsed = time.time() - self.start_at
         cycle = self.passage_time + self.arrival_time
 
         # --- SIGNAL PASSAGE COMPLETE at exact arrival edge ---
         if elapsed > self.passage_time and not self.passage_signaled:
-            msg = ACLMessage(ACLMessage.INFORM)
-            msg.set_ontology("passage-complete")
-            msg.add_receiver(AID(self.selection_agent_aid))  # Dynamically routed
-            msg.set_content(json.dumps({
-                "animal_id": self.current_animal_id,
-                "total_frames": self.captured_count,
-                "first_capture": self.first_capture,
-                "last_capture": self.last_capture
-            }))
-            self.agent.send(msg)
+            if self.agent.simulation_started:
+                msg = ACLMessage(ACLMessage.INFORM)
+                msg.set_ontology("passage-complete")
+                msg.add_receiver(AID(self.selection_agent_aid))  # Dynamically routed
+                msg.set_content(json.dumps({
+                    "animal_id": self.current_animal_id,
+                    "total_frames": self.captured_count,
+                    "first_capture": self.first_capture,
+                    "last_capture": self.last_capture
+                }))
+                self.agent.send(msg)
             self.passage_signaled = True
 
         # --- RESTART: cycle finished, advance to next animal ---
@@ -118,6 +128,7 @@ class CaptureBehaviour(TimedBehaviour):
             return
 
         # --- PASSAGE mode: animal is visible, capture and publish ---
+                
         frame_id = str(uuid.uuid4())[:12]
         from datetime import datetime
         now_iso = datetime.now().isoformat()
@@ -128,6 +139,10 @@ class CaptureBehaviour(TimedBehaviour):
         
         img = self.capture_adapter.get_frame()
         
+        if img is None:
+            display_message(self.agent.aid.name, f"[ERROR] capture_adapter.get_frame() returned None for animal {self.current_animal_id}!")
+            return
+            
         with self._lock:
             FRAME_BUFFER[frame_id] = img
 
@@ -140,6 +155,7 @@ class CaptureBehaviour(TimedBehaviour):
             "frame_index": self.captured_count,
             "elapsed_time": round(elapsed, 4),
         }, ensure_ascii=True))
+        
         self.agent.send(msg)
 
 
@@ -149,13 +165,14 @@ class CaptureAgent(Agent):
     def __init__(
         self,
         aid,
-        capture_adapter: CaptureAdapter,
+        capture_adapter,
         next_agent_aid: str,
         selection_agent_aid: str,
         interval_seconds: float = 0.2,
         herd_size: int = 1,
         passage_time: int = 30,
         arrival_time: int = 5,
+        wait_for_aids: list[str] = None,
         debug: bool = False,
     ):
         super().__init__(aid=aid, debug=debug)
@@ -166,16 +183,14 @@ class CaptureAgent(Agent):
         self.herd_size = herd_size
         self.passage_time = passage_time
         self.arrival_time = arrival_time
+        self.wait_for_aids = set(wait_for_aids) if wait_for_aids else set()
+        self.ready_agents = set()
+        self.simulation_started = False
 
     def on_start(self):
         super().on_start()
-        display_message(
-            self.aid.name,
-            f"CaptureAgent started — herd_size={self.herd_size}, "
-            f"passage_time={self.passage_time}s, arrival_time={self.arrival_time}s, "
-            f"fps={1/self.interval_seconds:.1f}.",
-        )
-        self.behaviours.append(CaptureBehaviour(
+        
+        self.capture_behaviour = CaptureBehaviour(
             agent=self,
             capture_adapter=self.capture_adapter,
             next_agent_aid=self.next_agent_aid,
@@ -184,7 +199,36 @@ class CaptureAgent(Agent):
             arrival_time=self.arrival_time,
             herd_size=self.herd_size,
             interval_seconds=self.interval_seconds,
-        ))
+        )
+        self.behaviours.append(self.capture_behaviour)
+        
+        if not self.wait_for_aids:
+            self.simulation_started = True
+            display_message(self.aid.name, f"CaptureAgent starting simulation — herd_size={self.herd_size}")
+        else:
+            display_message(self.aid.name, f"CaptureAgent waiting for agents: {self.wait_for_aids}")
+
+    def _start_simulation(self):
+        if self.simulation_started:
+            return
+        self.simulation_started = True
+        
+        display_message(
+            self.aid.name,
+            f"CaptureAgent IGNITED. Models loaded! Resuming capture."
+        )
 
     def react(self, message):
         super().react(message)
+        if message.ontology == "agent-ready":
+            try:
+                data = json.loads(message.content)
+                agent_name = data.get("agent")
+                self.ready_agents.add(agent_name)
+                display_message(self.aid.name, f"Agent {agent_name} is READY.")
+                
+                if self.wait_for_aids.issubset(self.ready_agents):
+                    display_message(self.aid.name, "All required agents are ready! Igniting simulation...")
+                    self._start_simulation()
+            except Exception as e:
+                display_message(self.aid.name, f"[ERROR] Processing agent-ready: {e}")

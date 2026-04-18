@@ -9,8 +9,17 @@ from domain.modules.frame_selection import FrameSelection
 class FrameSelectionAdapter:
     """Thin wrapper around domain FrameSelection."""
 
-    def __init__(self, suitable_window: float, snooze_duration: float) -> None:
-        self._selection = FrameSelection(suitable_window, snooze_duration)
+    def __init__(self, suitable_window: float, model_path: str) -> None:
+        self.suitable_window = suitable_window
+        self.model_path = model_path
+        self._selection = None
 
-    def evaluate(self, elapsed_time: float) -> bool:
-        return self._selection.evaluate(elapsed_time)
+    def load_model(self):
+        import keras
+        model = keras.models.load_model(self.model_path)
+        self._selection = FrameSelection(self.suitable_window, model)
+
+    def evaluate(self, elapsed_time: float, img) -> bool:
+        if not self._selection:
+            raise RuntimeError("Model not loaded yet. Call load_model() first.")
+        return self._selection.evaluate(elapsed_time, img)

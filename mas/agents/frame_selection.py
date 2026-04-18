@@ -32,11 +32,13 @@ class FrameSelectionAgent(Agent):
         aid,
         frame_selection_adapter: FrameSelectionAdapter,
         next_agent_aid: str,
+        capture_agent_aid: str = None,
         debug: bool = False,
     ):
         super().__init__(aid=aid, debug=debug)
         self.frame_selection_adapter = frame_selection_adapter
         self.next_agent_aid = next_agent_aid
+        self.capture_agent_aid = capture_agent_aid
         self.discarded = 0
         self.forwarded = 0
         self._lock = threading.Lock()
@@ -127,7 +129,17 @@ class FrameSelectionAgent(Agent):
 
     def _schedule_evaluation(self, payload: dict):
         elapsed = payload.get("elapsed_time", 0.0)
-        d = deferToThread(self.frame_selection_adapter.evaluate, elapsed)
+        frame_id = payload.get("frame_id")
+        
+        with self._lock:
+            img = FRAME_BUFFER.get(frame_id)
+            
+        if img is None:
+            display_message(self.aid.name, f"[WARN] Image not found in buffer for {frame_id}")
+            self._on_selection_complete(False, payload)
+            return
+            
+        d = deferToThread(self.frame_selection_adapter.evaluate, elapsed, img)
         d.addCallback(self._on_selection_complete, payload)
         d.addErrback(self._on_selection_error)
 
@@ -163,4 +175,20 @@ class FrameSelectionAgent(Agent):
 
     def on_start(self):
         super().on_start()
-        display_message(self.aid.name, "FrameSelectionAgent started.")
+        display_message(self.aid.name, "FrameSelectionAgent started. Loading selection model...")
+        
+        # Load model in background thread to avoid blocking the reactor
+        d = deferToThread(self.frame_selection_adapter.load_model)
+        d.addCallback(self._on_model_loaded)
+        d.addErrback(self._on_selection_error)
+
+    def _on_model_loaded(self, _):
+        display_message(self.aid.name, "Selection Model loaded successfully.")
+        
+        # Notify CaptureAgent that we are ready
+        if self.capture_agent_aid:
+            msg = ACLMessage(ACLMessage.INFORM)
+            msg.set_ontology("agent-ready")
+            msg.add_receiver(AID(self.capture_agent_aid))
+            msg.set_content(json.dumps({"agent": self.aid.name}))
+            self.send(msg)

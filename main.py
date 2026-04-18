@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     cpu_monitor = CPUMonitor(pid=pid)
     ram_monitor = RAMMonitor(pid=pid)
-    gpu_monitor = GPUMonitor(pid=pid)
+    #gpu_monitor = GPUMonitor(pid=pid)
 
     try:
         os.mkdir(f'infra/reports/{pid}')

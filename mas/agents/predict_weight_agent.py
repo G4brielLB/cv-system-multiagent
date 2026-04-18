@@ -17,6 +17,7 @@ import numpy as np
 
 from twisted.internet.threads import deferToThread
 
+from pade.acl.aid import AID
 from pade.acl.messages import ACLMessage
 from pade.core.agent import Agent
 from pade.misc.utility import display_message
@@ -35,6 +36,7 @@ class PredictWeightAgent(Agent):
         mode: str = "single",
         pid: str = "test",
         herd_size: int = 1,
+        capture_agent_aid: str = None,
         debug: bool = False,
     ):
         super().__init__(aid=aid, debug=debug)
@@ -42,6 +44,7 @@ class PredictWeightAgent(Agent):
         self.mode = mode
         self.pid = pid
         self.herd_size = herd_size
+        self.capture_agent_aid = capture_agent_aid
         
         self._predictions: dict[int, list[float]] = {}
         self._total_inferences = 0
@@ -208,7 +211,8 @@ class PredictWeightAgent(Agent):
                         
                     self.metrics['animals'][animal_id]['first_image_capture_time'] = capture_metrics.get("first_image_capture_time")
                     self.metrics['animals'][animal_id]['last_image_capture_time'] = capture_metrics.get("last_image_capture_time")
-                    self.metrics['animals'][animal_id]['suitable_frames_count'] = data.get("suitable_count", 0)
+                    self.metrics['animals'][animal_id]['suitable_images'] = data.get("suitable_count", 0)
+                    self.metrics['animals'][animal_id]['total_of_images'] = total_frames
                     
                 self._check_batch_ready_custom(animal_id, total_frames)
             except Exception as e:
@@ -301,6 +305,14 @@ class PredictWeightAgent(Agent):
     def _on_model_loaded(self, _):
         self.metrics['load_model_final'] = datetime.now().isoformat()
         display_message(self.aid.name, "AI Model loaded successfully.")
+        
+        # Notify CaptureAgent that we are ready
+        if self.capture_agent_aid:
+            msg = ACLMessage(ACLMessage.INFORM)
+            msg.set_ontology("agent-ready")
+            msg.add_receiver(AID(self.capture_agent_aid))
+            msg.set_content(json.dumps({"agent": self.aid.name}))
+            self.send(msg)
 
     def get_predictions_summary(self) -> dict:
         """Return per-animal prediction summaries (mean weights)."""

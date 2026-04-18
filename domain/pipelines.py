@@ -272,16 +272,17 @@ class MASStrategy:
         predict_aid       = aid("predict_weight_agent", 3)
         rm_aid            = aid("resource_manager_agent", 6)
 
+        model_path = "infra/models/model_run1_epoch029.keras"
+
         # 4. Adapters (shared domain logic, parity with baseline)
         capture_adapter    = CaptureAdapter()
         enhance_adapter    = DataEnhanceAdapter()
         selection_adapter  = FrameSelectionAdapter(
             suitable_window=self.fselection_window,
-            snooze_duration=self.fselection_time,
+            model_path=model_path,
         )
 
         # We pass the path to allow lazy/async loading in the agent
-        model_path = "infra/models/model_run1_epoch029.keras"
         inference_adapter = InferenceAdapter(model_path)
 
         # 5. Agents
@@ -290,10 +291,11 @@ class MASStrategy:
             capture_adapter=capture_adapter,
             next_agent_aid=enhance_aid.name,
             selection_agent_aid=selection_aid.name,
-            interval_seconds=0.2,
+            interval_seconds=self.fselection_time,
             herd_size=self.herd_size,
             passage_time=self.passage_time,
             arrival_time=self.arrival_time,
+            wait_for_aids=[selection_aid.name, predict_aid.name]
         )
 
         enhance_agent = DataEnhanceAgent(
@@ -306,6 +308,7 @@ class MASStrategy:
             aid=selection_aid,
             frame_selection_adapter=selection_adapter,
             next_agent_aid=predict_aid.name,
+            capture_agent_aid=capture_aid.name
         )
 
         predict_agent = PredictWeightAgent(
@@ -313,7 +316,8 @@ class MASStrategy:
             inference_adapter=inference_adapter,
             mode=self.mode,
             pid=self.pid,
-            herd_size=self.herd_size
+            herd_size=self.herd_size,
+            capture_agent_aid=capture_aid.name
         )
 
         resource_agent = ResourceManagerAgent(
