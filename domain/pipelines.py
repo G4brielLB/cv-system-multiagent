@@ -220,7 +220,6 @@ class MASStrategy:
 
     def run(self):
         """Starts the PADE agents and the main reactor loop."""
-        import os
         from dotenv import load_dotenv
         load_dotenv(override=True)
 
