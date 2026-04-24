@@ -33,9 +33,9 @@ class PredictWeightAgent(Agent):
         self,
         aid,
         inference_adapter: InferenceAdapter,
-        mode: str = "single",
-        pid: str = "test",
-        herd_size: int = 1,
+        mode: str,
+        pid: str,
+        herd_size: int,
         capture_agent_aid: str = None,
         debug: bool = False,
     ):
@@ -317,7 +317,6 @@ class PredictWeightAgent(Agent):
 
     def get_predictions_summary(self) -> dict:
         """Return per-animal prediction summaries (mean weights)."""
-        import numpy as np
         summary = {}
         for aid, weights in self._predictions.items():
             summary[aid] = {

@@ -7,29 +7,34 @@ from domain.pipelines import SingleStreamStrategy, BatchStreamStrategy, MASStrat
 def main(
         pid: str, strategy: str, herd_size: int, passage_time: int, arrival_time: int, fselection_time: float, fselection_window:float):
     
-    pipeline = SingleStreamStrategy(
-        pid=pid,
-        herd_size=herd_size, 
-        arrival_time=arrival_time, 
-        passage_time=passage_time,
-        fselection_time=fselection_time,
-        fselection_window=fselection_window, 
-    ) if strategy == 'single' else BatchStreamStrategy(
-        pid=pid,
-        herd_size=herd_size, 
-        passage_time=passage_time,
-        arrival_time=arrival_time, 
-        fselection_time=fselection_time,
-        fselection_window=fselection_window, 
-    ) if strategy == 'batch' else MASStrategy(
-        pid=pid,
-        mode='batch' if 'batch' in strategy else 'single',
-        herd_size=herd_size, 
-        passage_time=passage_time,
-        arrival_time=arrival_time, 
-        fselection_time=fselection_time,
-        fselection_window=fselection_window, 
-    )
+    if strategy == 'single':
+        pipeline = SingleStreamStrategy(
+            pid=pid,
+            herd_size=herd_size, 
+            arrival_time=arrival_time, 
+            passage_time=passage_time,
+            fselection_time=fselection_time,
+            fselection_window=fselection_window, 
+        )
+    elif strategy == 'batch':
+        pipeline = BatchStreamStrategy(
+            pid=pid,
+            herd_size=herd_size, 
+            passage_time=passage_time,
+            arrival_time=arrival_time, 
+            fselection_time=fselection_time,
+            fselection_window=fselection_window, 
+        )
+    else:
+        pipeline = MASStrategy(
+            pid=pid,
+            mode='batch' if 'batch' in strategy else 'single',
+            herd_size=herd_size, 
+            passage_time=passage_time,
+            arrival_time=arrival_time, 
+            fselection_time=fselection_time,
+            fselection_window=fselection_window, 
+        )
     
     pipeline.run()
 
